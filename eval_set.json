@@ -1,0 +1,72 @@
+[
+  {
+    "question": "Яка кампанія зібрала найбільше в серпні 2026 року в гривневому еквіваленті?",
+    "expected": "Дрони для бригади",
+    "type": "text",
+    "tolerance": 0,
+    "trap": "currency"
+  },
+  {
+    "question": "Скільки гривень (у гривневому еквіваленті) зібрали у вересні 2026 року?",
+    "expected": 416082.5,
+    "type": "number",
+    "tolerance": 0.01,
+    "trap": "dates"
+  },
+  {
+    "question": "Скільки пожертв надійшло в жовтні 2026 року?",
+    "expected": 86,
+    "type": "number",
+    "tolerance": 0.01,
+    "trap": "dates"
+  },
+  {
+    "question": "Яка середня пожертва від компаній у гривневому еквіваленті?",
+    "expected": 120803.33,
+    "type": "number",
+    "tolerance": 0.01,
+    "trap": "currency"
+  },
+  {
+    "question": "Скільки гривень ще лишилося зібрати на кампанію «Генератори» до цілі?",
+    "expected": 922602.5,
+    "type": "number",
+    "tolerance": 0.01,
+    "trap": "currency"
+  },
+  {
+    "question": "Яка сума пожертв у доларах (USD) за червень 2026 року, без конвертації?",
+    "expected": 3220.0,
+    "type": "number",
+    "tolerance": 0.01,
+    "trap": "dates"
+  },
+  {
+    "question": "Яка кампанія отримала найбільше пожертв (за кількістю) у липні 2026 року?",
+    "expected": "Евакуаційне авто",
+    "type": "text",
+    "tolerance": 0,
+    "trap": "dates"
+  },
+  {
+    "question": "Скільки гривень (у гривневому еквіваленті) зібрали за минулий місяць?",
+    "expected": 1157997.5,
+    "type": "number",
+    "tolerance": 0.01,
+    "trap": "relative_date"
+  },
+  {
+    "question": "Який місяць був найщедрішим за сумою в гривневому еквіваленті?",
+    "expected": "серпень 2026",
+    "type": "text",
+    "tolerance": 0,
+    "trap": "currency"
+  },
+  {
+    "question": "Скільки пожертв перевищують 10 000 грн у гривневому еквіваленті?",
+    "expected": 45,
+    "type": "number",
+    "tolerance": 0.01,
+    "trap": "currency"
+  }
+]

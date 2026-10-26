@@ -30,7 +30,7 @@ schema = "\n".join(row[0] for row in tables)
 
 resp = client.responses.create(
     model=MODEL,
-    instructions="Ти аналітик фонду. Схема нашої бази SQLite:\n" + schema,
+    instructions="Ти аналітик фонду. Відповідай простим текстом без Markdown. Схема бази SQLite:\n" + schema,
     input="Яка кампанія нашого фонду зібрала найбільше у серпні?",
 )
 print(resp.output_text)

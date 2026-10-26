@@ -7,7 +7,6 @@
     python 01_reflection_sql.py                    # головне питання, з reflection
     python 01_reflection_sql.py --no-reflection    # одна спроба, без виправлення
     python 01_reflection_sql.py --self-check       # модель спершу сама перевіряє свій SQL
-    python 01_reflection_sql.py 2                  # запасне питання №2
     python 01_reflection_sql.py "Скільки ..."      # питання від залу
 """
 
@@ -38,30 +37,26 @@ require_api_key()
 client = OpenAI()  # ключ з OPENAI_API_KEY
 
 
-# ---------------------------------------------------------------------------
-# Що модель повертає (structured output)
-# ---------------------------------------------------------------------------
+# === 1. Що модель повертає (structured output) ===
 
 class SqlDraft(BaseModel):
-    sql: str = Field(description="Один SQLite-запит SELECT")
-    explanation: str = Field(description="Коротко: що робить запит")
+    sql: str
+    explanation: str
 
 
 class Verdict(BaseModel):
-    ok: bool = Field(description="true, якщо помилок у запиті немає")
-    comment: str = Field(description="Коротке пояснення")
+    ok: bool
+    comment: str
 
 
 class Answer(BaseModel):
-    answer_text: str = Field(description="Відповідь для людини, 1–2 речення українською")
+    answer_text: str
     value: str = Field(description="Лише значення: число без пробілів (сума в гривнях або кількість), "
                                    "назва кампанії точно як у базі, або місяць у форматі 'серпень 2026'. "
                                    "Порожній рядок, якщо відповіді немає")
 
 
-# ---------------------------------------------------------------------------
-# База: схема, виконавець, приклади рядків
-# ---------------------------------------------------------------------------
+# === 2. База: схема, виконавець, приклади рядків ===
 
 def get_schema():
     """Схема таблиць з sqlite_master. Формату дат тут немає — і це пастка."""
@@ -86,12 +81,10 @@ def run_sql(sql):
         conn.close()
 
 
-def format_rows(columns, rows, limit=30):
+def format_rows(columns, rows):
     """Колонки і рядки як простий текст: 'campaign | uah'."""
     lines = [" | ".join(columns)]
-    lines += [" | ".join(str(value) for value in row) for row in rows[:limit]]
-    if len(rows) > limit:
-        lines.append(f"… ще рядків: {len(rows) - limit}")
+    lines += [" | ".join(str(value) for value in row) for row in rows]
     return "\n".join(lines)
 
 
@@ -101,9 +94,7 @@ def get_sample_rows():
     return format_rows(columns, rows)
 
 
-# ---------------------------------------------------------------------------
-# Сенсори: код, а не модель, перевіряє результат
-# ---------------------------------------------------------------------------
+# === 3. Сенсори: код, а не модель, перевіряє результат ===
 
 def sensor_sql_error(error):
     """Сенсор 1: база відповіла помилкою."""
@@ -135,9 +126,7 @@ def check_result(columns, rows, error):
     return sensor_sql_error(error) or sensor_empty_result(rows) or sensor_common_sense(columns, rows)
 
 
-# ---------------------------------------------------------------------------
-# Виклики моделі
-# ---------------------------------------------------------------------------
+# === 4. Виклики моделі ===
 
 # Валюти підказуємо заздалегідь — це guide. Формат дат не підказуємо — його ловить sensor.
 SQL_INSTRUCTIONS = f"""Ти аналітик благодійного фонду. Напиши один SQLite-запит, що відповідає на питання.
@@ -201,13 +190,10 @@ def formulate_answer(question, sql, result_text, log):
     return resp.output_parsed
 
 
-# ---------------------------------------------------------------------------
-# Головна логіка: генератор → виконавець → сенсори → фідбек
-# ---------------------------------------------------------------------------
+# === 5. Головна логіка: генератор → виконавець → сенсори → фідбек ===
 
-def answer_question(question, reflection=True, self_check=False, log=None):
+def answer_question(question, log, reflection=True, self_check=False):
     """Відповідає на питання по базі. Повертає dict для eval."""
-    log = log or Logger("01_reflection_sql", quiet=True)
     schema = get_schema()
     max_attempts = MAX_ATTEMPTS if reflection else 1
     failures = []  # [(sql, проблема), ...]
@@ -231,8 +217,6 @@ def answer_question(question, reflection=True, self_check=False, log=None):
             break
         log.error(f"Сенсор: {problem}")
         failures.append((draft.sql, problem))
-    else:
-        result_text += f"\n\nПеревірка не пройдена: {problem}"
 
     log.think(step=2)
     answer = formulate_answer(question, draft.sql, result_text, log)
@@ -253,17 +237,10 @@ if __name__ == "__main__":
     self_check = "--self-check" in args
     words = [arg for arg in args if not arg.startswith("--")]
 
-    if len(words) == 1 and words[0].isdigit():
-        question = BACKUP_QUESTIONS[int(words[0]) - 1]
-    else:
-        question = " ".join(words) or QUESTION
-
-    mode = "з reflection" if reflection else "без reflection"
-    if self_check:
-        mode += " + самоперевірка"
+    question = " ".join(words) or QUESTION
 
     log = Logger("01_reflection_sql")
-    log.title(f"Демо 1: SQL-агент {mode}")
+    log.title("Демо 1: SQL-агент")
     log.note(f"Питання: {question}")
-    answer_question(question, reflection=reflection, self_check=self_check, log=log)
+    answer_question(question, log, reflection=reflection, self_check=self_check)
     log.summary()

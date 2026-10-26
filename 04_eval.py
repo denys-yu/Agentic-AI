@@ -1,14 +1,11 @@
 """Демо 4: eval для Демо 1 — скільки питань агент розв'язує без reflection і з ним.
 
-Запуск:
-    python 04_eval.py              # один прогін eval_set.json
-    python 04_eval.py --repeat 3   # 3 прогони, середня точність
+Запуск:  python 04_eval.py
 """
 
 import importlib
 import json
 import re
-import sys
 from datetime import datetime
 
 from rich.console import Console
@@ -28,12 +25,8 @@ MONTH_STEMS = {
     "лип": 7, "серп": 8, "верес": 9, "жовт": 10, "листоп": 11, "груд": 12,
 }
 
-MODES = [("no_reflection", False), ("reflection", True)]
 
-
-# ---------------------------------------------------------------------------
-# Порівняння відповіді з еталоном
-# ---------------------------------------------------------------------------
+# === 1. Порівняння відповіді з еталоном ===
 
 def normalize(text):
     """Нижній регістр, без лапок і розділових знаків."""
@@ -42,22 +35,19 @@ def normalize(text):
 
 
 def month_number(text):
-    """Номер місяця з «серпень 2026», «у серпні», «08.2026» або «2026-08»; інакше None."""
+    """Номер місяця з «серпень 2026», «у серпні» або «08.2026»; інакше None."""
     for word in normalize(text):
         for stem, number in MONTH_STEMS.items():
             if word.startswith(stem):
                 return number
-    match = re.search(r"\b(\d{1,2})\.\d{4}\b", str(text)) or re.search(r"\b\d{4}-(\d{2})\b", str(text))
+    match = re.search(r"\b(\d{1,2})\.\d{4}\b", str(text))
     return int(match.group(1)) if match else None
 
 
 def parse_number(text):
-    """«1 073 450 грн», «1073450.5», «416 082,5» -> число; інакше None."""
-    digits = re.sub(r"[^\d,.\-]", "", str(text))
-    if "," in digits and "." in digits or digits.count(",") > 1:
-        digits = digits.replace(",", "")
+    """«1073450.5» або «416 082,5» -> число; інакше None."""
     try:
-        return float(digits.replace(",", "."))
+        return float(str(text).replace(" ", "").replace(",", "."))
     except ValueError:
         return None
 
@@ -83,29 +73,24 @@ def is_correct(item, value):
     return same_words(expected, value)
 
 
-# ---------------------------------------------------------------------------
-# Прогін
-# ---------------------------------------------------------------------------
+# === 2. Прогін ===
 
 def run_question(item, reflection, log):
-    """Одне питання в одному режимі. Збій API не зупиняє весь eval."""
-    try:
-        result = demo.answer_question(item["question"], reflection=reflection, log=log)
-    except Exception as error:
-        result = {"sql": "", "rows": [], "attempts": 0, "answer_text": f"Збій: {error}", "value": ""}
+    """Одне питання в одному режимі."""
+    result = demo.answer_question(item["question"], log, reflection=reflection)
     result["correct"] = is_correct(item, result["value"])
     return result
 
 
-def run_once(items, run_index, repeats, log):
-    """Один прогін усього набору в обох режимах."""
+def run_all(items, log):
+    """Усі питання в обох режимах, з прогресом на екрані."""
     results = []
     for i, item in enumerate(items, start=1):
-        console.print(f"[повтор {run_index}/{repeats}] питання {i}/{len(items)}…", end=" ")
+        console.print(f"питання {i}/{len(items)}…", end=" ")
         row = {"question": item["question"], "trap": item["trap"], "expected": item["expected"]}
-        for mode, reflection in MODES:
-            row[mode] = run_question(item, reflection, log)
-        marks = ["✓" if row[mode]["correct"] else "✗" for mode, _ in MODES]
+        row["no_reflection"] = run_question(item, False, log)
+        row["reflection"] = run_question(item, True, log)
+        marks = ["✓" if row[mode]["correct"] else "✗" for mode in ("no_reflection", "reflection")]
         console.print(f"без reflection {marks[0]} · з reflection {marks[1]} "
                       f"(спроб: {row['reflection']['attempts']})")
         results.append(row)
@@ -116,71 +101,49 @@ def accuracy(results, mode):
     return sum(r[mode]["correct"] for r in results) / len(results)
 
 
-# ---------------------------------------------------------------------------
-# Звіт
-# ---------------------------------------------------------------------------
+# === 3. Звіт ===
 
-def mark(correct_count, repeats):
-    """✓/✗ для одного прогону, k/N для кількох."""
-    if repeats == 1:
-        return "[bold green]✓[/]" if correct_count else "[bold red]✗[/]"
-    color = "green" if correct_count == repeats else "red" if correct_count == 0 else "yellow"
-    return f"[{color}]{correct_count}/{repeats}[/]"
+def mark(correct):
+    return "[bold green]✓[/]" if correct else "[bold red]✗[/]"
 
 
-def print_table(items, runs):
-    repeats = len(runs)
+def print_table(results):
     table = Table(title="Eval Демо 1", width=100)
     table.add_column("#", justify="right")
-    table.add_column("Питання", max_width=44)
+    table.add_column("Питання", max_width=44, no_wrap=True, overflow="ellipsis")
     table.add_column("Пастка")
     table.add_column("Без refl.", justify="center")
     table.add_column("З refl.", justify="center")
     table.add_column("Спроби", justify="center")
 
-    for i, item in enumerate(items):
-        rows = [run[i] for run in runs]
-        plain = sum(r["no_reflection"]["correct"] for r in rows)
-        refl = sum(r["reflection"]["correct"] for r in rows)
-        attempts = sum(r["reflection"]["attempts"] for r in rows) / repeats
-        question = item["question"] if len(item["question"]) <= 44 else item["question"][:43] + "…"
-        table.add_row(str(i + 1), question, item["trap"], mark(plain, repeats), mark(refl, repeats),
-                      f"{attempts:g}")
+    for i, row in enumerate(results, start=1):
+        table.add_row(str(i), row["question"], row["trap"], mark(row["no_reflection"]["correct"]),
+                      mark(row["reflection"]["correct"]), str(row["reflection"]["attempts"]))
     console.print()
     console.print(table)
-
-    plain = sum(accuracy(run, "no_reflection") for run in runs) / repeats
-    refl = sum(accuracy(run, "reflection") for run in runs) / repeats
-    note = f" (середнє за {repeats} прогони)" if repeats > 1 else ""
-    console.print(f"[bold]Точність{note}:[/] без reflection [bold]{plain:.0%}[/] · "
-                  f"з reflection [bold]{refl:.0%}[/]")
+    console.print(f"[bold]Точність:[/] без reflection [bold]{accuracy(results, 'no_reflection'):.0%}[/] · "
+                  f"з reflection [bold]{accuracy(results, 'reflection'):.0%}[/]")
 
 
-def print_errors(runs):
+def print_errors(results):
     """Error analysis: де помилився агент навіть з reflection."""
     console.print("\n[bold red]Помилки з reflection[/]")
-    found = False
-    for run_index, run in enumerate(runs, start=1):
-        for row in run:
-            result = row["reflection"]
-            if result["correct"]:
-                continue
-            found = True
-            console.print(f"\n[bold]{row['question']}[/] [dim](прогін {run_index}, пастка {row['trap']})[/]")
-            console.print(f"  очікувано: {row['expected']}")
-            console.print(f"  отримано:  {result['value']!r} — {result['answer_text']}")
-            console.print(f"  SQL: {' '.join(result['sql'].split())}")
-    if not found:
+    errors = [row for row in results if not row["reflection"]["correct"]]
+    for row in errors:
+        result = row["reflection"]
+        console.print(f"\n[bold]{row['question']}[/] [dim](пастка {row['trap']})[/]")
+        console.print(f"  очікувано: {row['expected']}")
+        console.print(f"  отримано:  {result['value']!r} — {result['answer_text']}")
+        console.print(f"  SQL: {' '.join(result['sql'].split())}")
+    if not errors:
         console.print("  немає")
 
 
-def save_results(runs, log):
+def save_results(results):
     path = TRACES_DIR / f"eval_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     report = {
-        "repeats": len(runs),
-        "accuracy": {mode: [accuracy(run, mode) for run in runs] for mode, _ in MODES},
-        "cost_usd": log.cost(),
-        "runs": runs,
+        "accuracy": {mode: accuracy(results, mode) for mode in ("no_reflection", "reflection")},
+        "results": results,
     }
     with open(path, "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
@@ -188,17 +151,15 @@ def save_results(runs, log):
 
 
 if __name__ == "__main__":
-    repeats = int(sys.argv[sys.argv.index("--repeat") + 1]) if "--repeat" in sys.argv else 1
-
     with open(EVAL_PATH, encoding="utf-8") as f:
         items = json.load(f)
 
     log = Logger("04_eval", quiet=True)  # повний трейс усіх викликів, на екран — лише прогрес
-    runs = [run_once(items, r, repeats, log) for r in range(1, repeats + 1)]
+    results = run_all(items, log)
 
-    print_table(items, runs)
-    print_errors(runs)
-    path = save_results(runs, log)
+    print_table(results)
+    print_errors(results)
+    path = save_results(results)
 
     cost = log.cost()
     console.print(f"\nВикликів моделі: {log.calls} · час моделі: {log.model_seconds:.0f} с · "

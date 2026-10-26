@@ -1,0 +1,14 @@
+# Секрети
+.env
+
+# Середовище і кеш Python
+.venv/
+__pycache__/
+
+# Артефакти демо
+traces/
+reports/*
+!reports/.gitkeep
+
+# IDE
+.idea/

@@ -30,6 +30,7 @@ schema = "\n".join(row[0] for row in tables)
 resp = client.responses.create(
     model=MODEL,
     instructions="Ти аналітик фонду. Напиши SQL-запит, який відповідає на питання. "
+                 "Якщо не маєш даних, напиши SQL-запит, який дав би відповідь. "
                  "Відповідай простим текстом без Markdown. Схема бази SQLite:\n" + schema,
     input="Яка кампанія нашого фонду зібрала найбільше у серпні?",
 )

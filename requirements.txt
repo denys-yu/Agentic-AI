@@ -2,3 +2,4 @@ openai==3.37.0
 python-dotenv==1.2.4
 rich==15.0.0
 pydantic==2.14.1
+openai-agents==0.24.0
